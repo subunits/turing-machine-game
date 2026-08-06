@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Turing Machine Puzzle Game</title>
+  <!-- React Production Builds -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone to compile JSX in browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body style="margin: 0; background: #0a0a15;">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    function createMachine(transitions, initialState, acceptStates, rejectStates) {
+      return { transitions, initialState, acceptStates, rejectStates };
+    }
+
+    function runMachine(machine, inputStr, maxSteps = 1000) {
+      const tape = inputStr === "" ? ["_"] : inputStr.split("");
+      let head = 0;
+      let state = machine.initialState;
+      const history = [{ tape: [...tape], head, state }];
+
+      for (let step = 0; step < maxSteps; step++) {
+        if (machine.acceptStates.includes(state)) {
+          return { accepted: true, tape, history, timedOut: false };
+        }
+        if (machine.rejectStates.includes(state)) {
+          return { accepted: false, tape, history, timedOut: false };
+        }
+
+        const symbol = tape[head] ?? "_";
+        const stateTransitions = machine.transitions[state];
+        if (!stateTransitions) {
+          return { accepted: false, tape, history, timedOut: false, error: `No transitions for state: ${state}` };
+        }
+        const transition = stateTransitions[symbol];
+        if (!transition) {
+          return { accepted: false, tape, history, timedOut: false, error: `No transition for state: ${state}, symbol: ${symbol}` };
+        }
+
+        const [nextState, writeSymbol, direction] = transition;
+        tape[head] = writeSymbol;
+        state = nextState;
+
+        if (direction === "R") {
+          head++;
+          if (head >= tape.length) tape.push("_");
+        } else if (direction === "L") {
+          head = Math.max(0, head - 1);
+        }
+
+        history.push({ tape: [...tape], head, state });
+      }
+
+      return { accepted: false, tape, history, timedOut: true };
+    }
+
+    function validateSolution(machine, testCases) {
+      return testCases.map((tc) => {
+        const result = runMachine(machine, tc.input);
+        const actualTape = result.tape.join("").replace(/_+$/, "");
+        const passed = result.accepted && actualTape === tc.expected;
+        return { ...tc, passed, actual: actualTape, accepted: result.accepted, timedOut: result.timedOut, history: result.history };
+      });
+    }
+
+    const LEVELS = [
+      {
+        id: 1, name: "Echo",
+        description: "Copy the input tape exactly. Read each symbol and move right until you reach a blank.",
+        hint: "Use a single state that moves right on any symbol and accepts at blank.",
+        test_cases: [
+          { input: "a", expected: "a", description: "Single char" },
+          { input: "ab", expected: "ab", description: "Two chars" },
+          { input: "aaa", expected: "aaa", description: "Repeated chars" },
+        ],
+        starter: `{\n  "q0": {\n    "a": ["q0", "a", "R"],\n    "b": ["q0", "b", "R"],\n    "_": ["accept", "_", "N"]\n  },\n  "accept": {}\n}`,
+        initial_state: "q0", accept_states: ["accept"], reject_states: ["reject"],
+      },
+      {
+        id: 2, name: "Unary Increment",
+        description: "Add one to a unary number (string of 1s). Scan right past all 1s and write an additional 1.",
+        hint: "Scan right past all 1s, write one more 1 at the blank, then accept.",
+        test_cases: [
+          { input: "1", expected: "11", description: "One 1" },
+          { input: "11", expected: "111", description: "Two 1s" },
+          { input: "111", expected: "1111", description: "Three 1s" },
+        ],
+        starter: `{\n  "q0": {\n    "1": ["q0", "1", "R"],\n    "_": ["q1", "1", "N"]\n  },\n  "q1": {\n    "1": ["accept", "1", "N"]\n  },\n  "accept": {}\n}`,
+        initial_state: "q0", accept_states: ["accept"], reject_states: ["reject"],
+      },
+      {
+        id: 3, name: "Strip Trailing Blanks",
+        description: "Remove trailing blanks from the tape.",
+        hint: "Scan right to find the end, then walk back erasing blanks until you hit a non-blank.",
+        test_cases: [
+          { input: "a___", expected: "a", description: "Single char + blanks" },
+          { input: "ab___", expected: "ab", description: "Two chars + blanks" },
+          { input: "abc___", expected: "abc", description: "Three chars + blanks" },
+        ],
+        starter: `{\n  "q0": {\n    "a": ["q0", "a", "R"],\n    "b": ["q0", "b", "R"],\n    "c": ["q0", "c", "R"],\n    "_": ["q1", "_", "L"]\n  },\n  "q1": {\n    "_": ["q1", "_", "L"],\n    "a": ["accept", "a", "N"],\n    "b": ["accept", "b", "N"],\n    "c": ["accept", "c", "N"]\n  },\n  "accept": {}\n}`,
+        initial_state: "q0", accept_states: ["accept"], reject_states: ["reject"],
+      },
+      {
+        id: 4, name: "Palindrome Check",
+        description: "Verify if the input is a palindrome. Accept if it reads the same forwards and backwards.",
+        hint: "Mark the leftmost symbol, scan right to compare with rightmost, repeat.",
+        test_cases: [
+          { input: "a", expected: "a", description: "Single char" },
+          { input: "aa", expected: "aa", description: "Two same" },
+          { input: "aba", expected: "aba", description: "Classic palindrome" },
+        ],
+        starter: `{\n  "q0": {\n    "a": ["q1a", "X", "R"],\n    "b": ["q1b", "X", "R"],\n    "X": ["accept", "X", "N"],\n    "_": ["accept", "_", "N"]\n  },\n  "q1a": {},\n  "q1b": {},\n  "accept": {}\n}`,
+        initial_state: "q0", accept_states: ["accept"], reject_states: ["reject"],
+      },
+      {
+        id: 5, name: "Mark Evens",
+        description: "Convert even-indexed symbols (0-based) to uppercase.",
+        hint: "Alternate between two states: one that uppercases, one that leaves as-is.",
+        test_cases: [
+          { input: "abab", expected: "AbAb", description: "Alternating" },
+          { input: "aaaa", expected: "AaAa", description: "All same" },
+          { input: "abc", expected: "AbC", description: "Three chars" },
+        ],
+        starter: `{\n  "q_even": {\n    "a": ["q_odd", "A", "R"],\n    "b": ["q_odd", "B", "R"],\n    "c": ["q_odd", "C", "R"],\n    "_": ["accept", "_", "N"]\n  },\n  "q_odd": {\n    "a": ["q_even", "a", "R"],\n    "b": ["q_even", "b", "R"],\n    "c": ["q_even", "c", "R"],\n    "_": ["accept", "_", "N"]\n  },\n  "accept": {}\n}`,
+        initial_state: "q_even", accept_states: ["accept"], reject_states: ["reject"],
+      },
+    ];
+
+    function TapeViz({ tape, head, state, stepIdx, totalSteps }) {
+      const cellW = 44, cellH = 44, padding = 4;
+      const visibleCount = 11;
+      const startIdx = Math.max(0, head - Math.floor(visibleCount / 2));
+      const cells = Array.from({ length: visibleCount }, (_, i) => ({
+        symbol: tape[startIdx + i] ?? "_",
+        idx: startIdx + i,
+        isHead: startIdx + i === head,
+      }));
+      const svgW = visibleCount * (cellW + padding) + padding;
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%", overflowX: "auto" }}>
+          <svg width={svgW} height={100} style={{ overflow: "visible" }}>
+            {cells.map((cell, i) => {
+              const x = i * (cellW + padding) + padding;
+              const y = 28;
+              return (
+                <g key={i}>
+                  <rect x={x} y={y} width={cellW} height={cellH} rx={6}
+                    fill={cell.isHead ? "#6366f1" : cell.symbol === "_" ? "#1e1e2e" : "#2d2d44"}
+                    stroke={cell.isHead ? "#a5b4fc" : "#3d3d5e"}
+                    strokeWidth={cell.isHead ? 2 : 1}
+                  />
+                  <text x={x + cellW / 2} y={y + cellH / 2 + 5}
+                    textAnchor="middle" fontSize={18} fontFamily="monospace"
+                    fill={cell.isHead ? "#fff" : cell.symbol === "_" ? "#444" : "#c4c4d4"}>
+                    {cell.symbol}
+                  </text>
+                  {cell.isHead && (
+                    <text x={x + cellW / 2} y={y - 8} textAnchor="middle" fontSize={11} fill="#a5b4fc">▼</text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+          <div style={{ display: "flex", gap: 16, fontSize: 12, color: "#888" }}>
+            <span>State: <span style={{ color: "#a5b4fc", fontFamily: "monospace" }}>{state}</span></span>
+            <span>Head: <span style={{ color: "#a5b4fc" }}>{head}</span></span>
+            {totalSteps > 0 && <span>Step: <span style={{ color: "#a5b4fc" }}>{stepIdx + 1}/{totalSteps}</span></span>}
+          </div>
+        </div>
+      );
+    }
+
+    function StateDiagram({ transitions, currentState }) {
+      const states = Object.keys(transitions || {});
+      if (states.length === 0) return null;
+
+      const r = 28, svgW = 500, svgH = 180;
+      const maxPerRow = Math.min(states.length, 5);
+      const positions = {};
+      states.forEach((s, i) => {
+        const col = i % maxPerRow;
+        const row = Math.floor(i / maxPerRow);
+        positions[s] = {
+          x: 50 + col * ((svgW - 100) / Math.max(maxPerRow - 1, 1)),
+          y: 50 + row * 90,
+        };
+      });
+
+      const edges = [];
+      states.forEach((fromState) => {
+        const trans = transitions[fromState] || {};
+        const targetMap = {};
+        Object.entries(trans).forEach(([sym, [nextState, write, dir]]) => {
+          const key = `${fromState}->${nextState}`;
+          if (!targetMap[key]) targetMap[key] = [];
+          targetMap[key].push(`${sym}:${write},${dir}`);
+        });
+        Object.entries(targetMap).forEach(([key, labels]) => {
+          const [from, to] = key.split("->");
+          if (positions[from] && positions[to]) {
+            edges.push({ from, to, label: labels.join(" | ") });
+          }
+        });
+      });
+
+      return (
+        <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`}
+          style={{ background: "#0f0f1a", borderRadius: 10, border: "1px solid #2d2d44" }}>
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#555" />
+            </marker>
+          </defs>
+          {edges.map((e, i) => {
+            const fp = positions[e.from], tp = positions[e.to];
+            if (!fp || !tp) return null;
+            if (e.from === e.to) {
+              return (
+                <g key={i}>
+                  <path d={`M${fp.x - 10},${fp.y - r} C${fp.x - 40},${fp.y - 60} ${fp.x + 40},${fp.y - 60} ${fp.x + 10},${fp.y - r}`}
+                    fill="none" stroke="#3d3d5e" strokeWidth={1.5} markerEnd="url(#arrow)" />
+                  <text x={fp.x} y={fp.y - 58} textAnchor="middle" fontSize={9} fill="#666" fontFamily="monospace">{e.label}</text>
+                </g>
+              );
+            }
+            const dx = tp.x - fp.x, dy = tp.y - fp.y, len = Math.sqrt(dx * dx + dy * dy);
+            const ux = dx / len, uy = dy / len;
+            const x1 = fp.x + ux * r, y1 = fp.y + uy * r;
+            const x2 = tp.x - ux * (r + 8), y2 = tp.y - uy * (r + 8);
+            const mx = (x1 + x2) / 2 - uy * 15, my = (y1 + y2) / 2 + ux * 15;
+            return (
+              <g key={i}>
+                <path d={`M${x1},${y1} Q${mx},${my} ${x2},${y2}`}
+                  fill="none" stroke="#3d3d5e" strokeWidth={1.5} markerEnd="url(#arrow)" />
+                <text x={mx} y={my - 4} textAnchor="middle" fontSize={9} fill="#666" fontFamily="monospace">{e.label}</text>
+              </g>
+            );
+          })}
+          {states.map((s) => {
+            const p = positions[s];
+            if (!p) return null;
+            const isAccept = s === "accept";
+            const isReject = s === "reject";
+            const isActive = s === currentState;
+            return (
+              <g key={s}>
+                <circle cx={p.x} cy={p.y} r={r}
+                  fill={isActive ? "#6366f1" : isAccept ? "#1a3a2a" : isReject ? "#3a1a1a" : "#1e1e2e"}
+                  stroke={isActive ? "#a5b4fc" : isAccept ? "#4ade80" : isReject ? "#f87171" : "#3d3d5e"}
+                  strokeWidth={isActive ? 2.5 : 1.5}
+                />
+                {isAccept && <circle cx={p.x} cy={p.y} r={r - 4} fill="none" stroke="#4ade80" strokeWidth={1} />}
+                <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize={10} fontFamily="monospace"
+                  fill={isActive ? "#fff" : isAccept ? "#4ade80" : isReject ? "#f87171" : "#aaa"}>
+                  {s.length > 8 ? s.slice(0, 7) + "…" : s}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
+    function TestResults({ results, onStepThrough }) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {results.map((r, i) => (
+            <div key={i} style={{
+              background: r.passed ? "#0d2a1a" : "#2a0d0d",
+              border: `1px solid ${r.passed ? "#4ade80" : "#f87171"}`,
+              borderRadius: 8, padding: "10px 14px",
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 16 }}>{r.passed ? "✓" : "✗"}</span>
+                <div>
+                  <div style={{ fontSize: 12, color: "#888" }}>{r.description}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: 13, color: "#ccc" }}>
+                    <span style={{ color: "#888" }}>in:</span> "{r.input}"&nbsp;
+                    <span style={{ color: "#888" }}>exp:</span> "{r.expected}"
+                    {!r.passed && <><br /><span style={{ color: "#f87171" }}>got:</span> "{r.actual}"</>}
+                  </div>
+                </div>
+              </div>
+              {!r.passed && r.history && (
+                <button onClick={() => onStepThrough(r)} style={{
+                  background: "#2d2d44", border: "1px solid #4d4d70", borderRadius: 6,
+                  color: "#a5b4fc", fontSize: 12, padding: "4px 10px", cursor: "pointer", whiteSpace: "nowrap",
+                }}>
+                  Step
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    function btnStyle(disabled) {
+      return {
+        background: disabled ? "#1a1a2e" : "#2d2d44",
+        border: "1px solid #3d3d5e", borderRadius: 6,
+        color: disabled ? "#444" : "#a5b4fc",
+        padding: "6px 14px", cursor: disabled ? "default" : "pointer", fontSize: 13,
+      };
+    }
+
+    function StepModal({ result, transitions, onClose }) {
+      const [stepIdx, setStepIdx] = useState(0);
+      const total = result.history.length;
+      const frame = result.history[Math.min(stepIdx, total - 1)];
+
+      return (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 100,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }} onClick={onClose}>
+          <div style={{
+            background: "#13131f", border: "1px solid #3d3d5e", borderRadius: 14,
+            padding: 20, maxWidth: 600, width: "100%",
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ color: "#fff", fontWeight: 600, fontSize: 15 }}>Step-through: "{result.input}"</div>
+              <button onClick={onClose} style={{ background: "none", border: "none", color: "#888", fontSize: 20, cursor: "pointer" }}>✕</button>
+            </div>
+            <TapeViz tape={frame.tape} head={frame.head} state={frame.state} stepIdx={stepIdx} totalSteps={total} />
+            <div style={{ margin: "16px 0" }}>
+              <StateDiagram transitions={transitions} currentState={frame.state} />
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+              <button onClick={() => setStepIdx(0)} disabled={stepIdx === 0} style={btnStyle(stepIdx === 0)}>Start</button>
+              <button onClick={() => setStepIdx((s) => Math.max(s - 1, 0))} disabled={stepIdx === 0} style={btnStyle(stepIdx === 0)}>Back</button>
+              <button onClick={() => setStepIdx((s) => Math.min(s + 1, total - 1))} disabled={stepIdx === total - 1} style={btnStyle(stepIdx === total - 1)}>Next</button>
+              <button onClick={() => setStepIdx(total - 1)} disabled={stepIdx === total - 1} style={btnStyle(stepIdx === total - 1)}>End</button>
+            </div>
+            <div style={{ textAlign: "center", marginTop: 10, fontSize: 12, color: "#888" }}>
+              Step {stepIdx + 1} of {total}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function EditorScreen({ level, onBack, onComplete, savedCode, onSave }) {
+      const [code, setCode] = useState(savedCode || level.starter);
+      const [results, setResults] = useState(null);
+      const [parseError, setParseError] = useState(null);
+      const [stepTarget, setStepTarget] = useState(null);
+      const [transitions, setTransitions] = useState(null);
+
+      const handleTest = useCallback(() => {
+        let parsed;
+        try { parsed = JSON.parse(code); }
+        catch (e) { setParseError(e.message); setResults(null); return; }
+        setParseError(null);
+        setTransitions(parsed);
+        const machine = createMachine(parsed, level.initial_state, level.accept_states, level.reject_states);
+        const res = validateSolution(machine, level.test_cases);
+        setResults(res);
+        onSave(level.id, code);
+      }, [code, level, onSave]);
+
+      const allPassed = results && results.every((r) => r.passed);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: "1px solid #2d2d44", flexShrink: 0 }}>
+            <button onClick={onBack} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 20 }}>←</button>
+            <div>
+              <div style={{ fontSize: 10, color: "#6366f1", fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>Level {level.id}</div>
+              <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>{level.name}</div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flex: 1, flexDirection: "column", overflowY: "auto" }}>
+            <div style={{ padding: "10px 16px", background: "#0d0d1a", borderBottom: "1px solid #1e1e2e" }}>
+              <div style={{ fontSize: 12, color: "#888" }}>{level.description}</div>
+              <div style={{ fontSize: 11, color: "#6366f1", marginTop: 4 }}>💡 {level.hint}</div>
+            </div>
+
+            <textarea
+              value={code}
+              onChange={(e) => { setCode(e.target.value); setResults(null); setParseError(null); }}
+              spellCheck={false}
+              style={{
+                width: "100%", height: 220, background: "#0a0a15", color: "#e2e2f2",
+                fontFamily: "monospace", fontSize: 13, lineHeight: 1.5, border: "none", outline: "none",
+                padding: 16, boxSizing: "border-box", resize: "vertical", tabSize: 2,
+              }}
+            />
+
+            {parseError && (
+              <div style={{ padding: "8px 16px", background: "#2a0d0d", color: "#f87171", fontSize: 12, fontFamily: "monospace" }}>
+                ✗ {parseError}
+              </div>
+            )}
+
+            <div style={{ padding: "10px 16px", borderTop: "1px solid #2d2d44", display: "flex", gap: 10, background: "#0a0a15" }}>
+              <button onClick={() => { setCode(level.starter); setResults(null); setParseError(null); }} style={btnStyle(false)}>Reset</button>
+              <button onClick={handleTest} style={{
+                background: "#4f46e5", border: "none", borderRadius: 6, color: "#fff",
+                padding: "7px 20px", cursor: "pointer", fontWeight: 600, fontSize: 13, marginLeft: "auto",
+              }}>
+                Run Tests
+              </button>
+            </div>
+
+            <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16, background: "#0d0d1a", flex: 1 }}>
+              <div>
+                <div style={{ fontSize: 11, color: "#888", fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>
+                  Test Cases
+                </div>
+                {results ? (
+                  <TestResults results={results} onStepThrough={setStepTarget} />
+                ) : (
+                  level.test_cases.map((tc, i) => (
+                    <div key={i} style={{
+                      background: "#1a1a2e", border: "1px solid #2d2d44", borderRadius: 8,
+                      padding: "8px 12px", marginBottom: 6, fontSize: 12,
+                    }}>
+                      <span style={{ fontFamily: "monospace", color: "#aaa" }}>"{tc.input}"</span>
+                      <span style={{ color: "#555", margin: "0 6px" }}>→</span>
+                      <span style={{ fontFamily: "monospace", color: "#aaa" }}>"{tc.expected}"</span>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {transitions && (
+                <div>
+                  <div style={{ fontSize: 11, color: "#888", fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>
+                    State Diagram
+                  </div>
+                  <StateDiagram transitions={transitions} currentState={level.initial_state} />
+                </div>
+              )}
+
+              {allPassed && (
+                <button onClick={onComplete} style={{
+                  background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                  border: "none", borderRadius: 10, color: "#fff",
+                  padding: 14, cursor: "pointer", fontWeight: 700, fontSize: 15, width: "100%",
+                }}>
+                  🎉 Complete Level →
+                </button>
+              )}
+            </div>
+          </div>
+
+          {stepTarget && (
+            <StepModal result={stepTarget} transitions={transitions} onClose={() => setStepTarget(null)} />
+          )}
+        </div>
+      );
+    }
+
+    function LevelSelect({ completed, onSelect, onBack }) {
+      return (
+        <div style={{ padding: 24, maxWidth: 600, margin: "0 auto", overflowY: "auto", height: "100vh", boxSizing: "border-box" }}>
+          <button onClick={onBack} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 14, marginBottom: 16 }}>← Menu</button>
+          <h2 style={{ color: "#fff", marginBottom: 4, fontSize: 20 }}>Select a Level</h2>
+          <p style={{ color: "#555", fontSize: 13, marginBottom: 20 }}>{completed.length}/{LEVELS.length} completed</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {LEVELS.map((lvl) => {
+              const done = completed.includes(lvl.id);
+              return (
+                <button key={lvl.id} onClick={() => onSelect(lvl)} style={{
+                  background: done ? "#0d2a1a" : "#13131f",
+                  border: `1px solid ${done ? "#4ade80" : "#2d2d44"}`,
+                  borderRadius: 10, padding: "14px 16px", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 14, textAlign: "left", width: "100%",
+                }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+                    background: done ? "#4ade80" : "#1e1e2e",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: done ? "#0a0a15" : "#555", fontWeight: 700, fontSize: 13,
+                  }}>
+                    {done ? "✓" : lvl.id}
+                  </div>
+                  <div>
+                    <div style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>{lvl.name}</div>
+                    <div style={{ color: "#555", fontSize: 11, marginTop: 2 }}>{lvl.description}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    function HowToPlay({ onBack }) {
+      return (
+        <div style={{ padding: 24, maxWidth: 560, margin: "0 auto", overflowY: "auto", height: "100vh", boxSizing: "border-box" }}>
+          <button onClick={onBack} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 14, marginBottom: 16 }}>← Back</button>
+          <h2 style={{ color: "#fff", marginBottom: 20, fontSize: 20 }}>How to Play</h2>
+          <div style={{ color: "#aaa", fontSize: 13, lineHeight: 1.6 }}>
+            <p><strong style={{ color: "#a5b4fc" }}>Goal:</strong> Write transition rules in JSON format to make the Turing machine pass all test cases for each level.</p>
+            <p><strong style={{ color: "#a5b4fc" }}>Format:</strong><br /><code>{`{\n  "state": {\n    "symbol": ["next_state", "write_symbol", "direction (R/L/N)"]\n  }\n}`}</code></p>
+          </div>
+        </div>
+      );
+    }
+
+    function MainMenu({ onPlay, onHowTo }) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", padding: 20 }}>
+          <h1 style={{ color: "#fff", fontSize: 26, fontWeight: 800, marginBottom: 4 }}>Turing Machine</h1>
+          <p style={{ color: "#6366f1", fontSize: 12, marginBottom: 36, letterSpacing: 2, textTransform: "uppercase" }}>Puzzle Game</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, width: 220 }}>
+            <button onClick={onPlay} style={{
+              background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+              border: "none", borderRadius: 10, color: "#fff",
+              padding: 14, cursor: "pointer", fontWeight: 700, fontSize: 15,
+            }}>Play</button>
+            <button onClick={onHowTo} style={{
+              background: "#1e1e2e", border: "1px solid #3d3d5e", borderRadius: 10, color: "#a5b4fc",
+              padding: 12, cursor: "pointer", fontWeight: 600, fontSize: 13,
+            }}>How to Play</button>
+          </div>
+        </div>
+      );
+    }
+
+    const STORAGE_KEY = "tmg_v1";
+    function loadSave() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; }
+    }
+    function writeSave(data) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+    }
+
+    function App() {
+      const [screen, setScreen] = useState("menu");
+      const [activeLevel, setActiveLevel] = useState(null);
+      const [save, setSave] = useState(loadSave);
+
+      const completed = save.completed || [];
+      const savedCode = save.code || {};
+
+      const handleSaveCode = (id, code) => {
+        const next = { ...save, code: { ...savedCode, [id]: code } };
+        setSave(next); writeSave(next);
+      };
+
+      const handleComplete = () => {
+        const next = { ...save, completed: [...new Set([...completed, activeLevel.id])] };
+        setSave(next); writeSave(next);
+        const nextIdx = LEVELS.findIndex((l) => l.id === activeLevel.id) + 1;
+        if (nextIdx < LEVELS.length) {
+          setActiveLevel(LEVELS[nextIdx]);
+        } else {
+          setScreen("levels");
+        }
+      };
+
+      return (
+        <div style={{ background: "#0a0a15", color: "#e2e2f2", minHeight: "100vh", fontFamily: "-apple-system, sans-serif" }}>
+          {screen === "menu" && <MainMenu onPlay={() => setScreen("levels")} onHowTo={() => setScreen("howto")} />}
+          {screen === "howto" && <HowToPlay onBack={() => setScreen("menu")} />}
+          {screen === "levels" && (
+            <LevelSelect completed={completed}
+              onSelect={(lvl) => { setActiveLevel(lvl); setScreen("editor"); }}
+              onBack={() => setScreen("menu")} />
+          )}
+          {screen === "editor" && activeLevel && (
+            <EditorScreen level={activeLevel} onBack={() => setScreen("levels")}
+              onComplete={handleComplete} savedCode={savedCode[activeLevel.id]} onSave={handleSaveCode} />
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
