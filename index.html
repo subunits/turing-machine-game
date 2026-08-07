@@ -157,35 +157,35 @@
         ],
         starter: `{
   "q0": {
-    "a": ["scan_right_a", "X", "R"],
-    "b": ["scan_right_b", "X", "R"],
-    "X": ["accept", "X", "N"],
-    "_": ["accept", "_", "N"]
+    "a": ["scan_right_a", "???", "?"],
+    "b": ["scan_right_b", "???", "?"],
+    "X": ["???", "X", "N"],
+    "_": ["???", "_", "N"]
   },
   "scan_right_a": {
-    "a": ["scan_right_a", "a", "R"],
-    "b": ["scan_right_a", "b", "R"],
-    "X": ["scan_right_a", "X", "R"],
-    "_": ["check_a", "_", "L"]
+    "a": ["scan_right_a", "a", "?"],
+    "b": ["scan_right_a", "b", "?"],
+    "X": ["scan_right_a", "X", "?"],
+    "_": ["check_a", "_", "?"]
   },
   "scan_right_b": {
-    "a": ["scan_right_b", "a", "R"],
-    "b": ["scan_right_b", "b", "R"],
-    "X": ["scan_right_b", "X", "R"],
-    "_": ["check_b", "_", "L"]
+    "a": ["scan_right_b", "a", "?"],
+    "b": ["scan_right_b", "b", "?"],
+    "X": ["scan_right_b", "X", "?"],
+    "_": ["check_b", "_", "?"]
   },
   "check_a": {
-    "a": ["scan_left", "X", "L"],
-    "X": ["accept", "X", "N"]
+    "a": ["???", "???", "?"],
+    "X": ["???", "X", "N"]
   },
   "check_b": {
-    "b": ["scan_left", "X", "L"],
-    "X": ["accept", "X", "N"]
+    "b": ["???", "???", "?"],
+    "X": ["???", "X", "N"]
   },
   "scan_left": {
-    "a": ["scan_left", "a", "L"],
-    "b": ["scan_left", "b", "L"],
-    "X": ["q0", "X", "R"]
+    "a": ["scan_left", "a", "?"],
+    "b": ["scan_left", "b", "?"],
+    "X": ["???", "X", "?"]
   },
   "accept": {},
   "reject": {}
