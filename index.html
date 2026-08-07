@@ -146,46 +146,43 @@
       },
       {
         id: 4, name: "Palindrome Check",
-        description: "Accept if the input reads the same forwards and backwards. The tape must be unchanged on accept.",
-        hint: "Read leftmost symbol → mark it X → scan right to the last real symbol → check it matches → mark it X → scan back left → repeat.",
+        description: "Accept if the input is a palindrome. Erase from both ends inward — tape will be blank on accept.",
+        hint: "Erase leftmost symbol, remember it in state name → scan right to last symbol → if it matches erase it → scan back left → repeat. Accept when tape is all blank.",
         test_cases: [
-          { input: "a", expected: "a", description: "Single char" },
-          { input: "aa", expected: "aa", description: "Even-length palindrome" },
-          { input: "aba", expected: "aba", description: "Odd-length palindrome" },
-          { input: "abba", expected: "abba", description: "Four-char palindrome" },
-          { input: "abcba", expected: "abcba", description: "Five-char palindrome" },
+          { input: "a", expected: "", description: "Single char" },
+          { input: "aa", expected: "", description: "Even-length palindrome" },
+          { input: "aba", expected: "", description: "Odd-length palindrome" },
+          { input: "abba", expected: "", description: "Four-char palindrome" },
+          { input: "abcba", expected: "", description: "Five-char palindrome" },
         ],
         starter: `{
   "q0": {
-    "a": ["scan_right_a", "???", "?"],
-    "b": ["scan_right_b", "???", "?"],
-    "X": ["???", "X", "N"],
+    "a": ["scan_right_a", "_", "R"],
+    "b": ["scan_right_b", "_", "R"],
     "_": ["???", "_", "N"]
   },
   "scan_right_a": {
     "a": ["scan_right_a", "a", "?"],
     "b": ["scan_right_a", "b", "?"],
-    "X": ["scan_right_a", "X", "?"],
     "_": ["check_a", "_", "?"]
   },
   "scan_right_b": {
     "a": ["scan_right_b", "a", "?"],
     "b": ["scan_right_b", "b", "?"],
-    "X": ["scan_right_b", "X", "?"],
     "_": ["check_b", "_", "?"]
   },
   "check_a": {
-    "a": ["???", "???", "?"],
-    "X": ["???", "X", "N"]
+    "a": ["???", "_", "?"],
+    "_": ["???", "_", "N"]
   },
   "check_b": {
-    "b": ["???", "???", "?"],
-    "X": ["???", "X", "N"]
+    "b": ["???", "_", "?"],
+    "_": ["???", "_", "N"]
   },
   "scan_left": {
     "a": ["scan_left", "a", "?"],
     "b": ["scan_left", "b", "?"],
-    "X": ["???", "X", "?"]
+    "_": ["???", "_", "?"]
   },
   "accept": {},
   "reject": {}
