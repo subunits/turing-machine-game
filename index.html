@@ -146,14 +146,50 @@
       },
       {
         id: 4, name: "Palindrome Check",
-        description: "Accept if the input reads the same forwards and backwards.",
-        hint: "Mark leftmost symbol, scan right to compare with rightmost, repeat.",
+        description: "Accept if the input reads the same forwards and backwards. The tape must be unchanged on accept.",
+        hint: "Read leftmost symbol → mark it X → scan right to the last real symbol → check it matches → mark it X → scan back left → repeat.",
         test_cases: [
           { input: "a", expected: "a", description: "Single char" },
-          { input: "aa", expected: "aa", description: "Two same" },
-          { input: "aba", expected: "aba", description: "Classic palindrome" },
+          { input: "aa", expected: "aa", description: "Even-length palindrome" },
+          { input: "aba", expected: "aba", description: "Odd-length palindrome" },
+          { input: "abba", expected: "abba", description: "Four-char palindrome" },
+          { input: "abcba", expected: "abcba", description: "Five-char palindrome" },
         ],
-        starter: `{\n  "q0": {\n    "a": ["q1a", "X", "R"],\n    "b": ["q1b", "X", "R"],\n    "X": ["accept", "X", "N"],\n    "_": ["accept", "_", "N"]\n  },\n  "q1a": {},\n  "q1b": {},\n  "accept": {}\n}`,
+        starter: `{
+  "q0": {
+    "a": ["scan_right_a", "X", "R"],
+    "b": ["scan_right_b", "X", "R"],
+    "X": ["accept", "X", "N"],
+    "_": ["accept", "_", "N"]
+  },
+  "scan_right_a": {
+    "a": ["scan_right_a", "a", "R"],
+    "b": ["scan_right_a", "b", "R"],
+    "X": ["scan_right_a", "X", "R"],
+    "_": ["check_a", "_", "L"]
+  },
+  "scan_right_b": {
+    "a": ["scan_right_b", "a", "R"],
+    "b": ["scan_right_b", "b", "R"],
+    "X": ["scan_right_b", "X", "R"],
+    "_": ["check_b", "_", "L"]
+  },
+  "check_a": {
+    "a": ["scan_left", "X", "L"],
+    "X": ["accept", "X", "N"]
+  },
+  "check_b": {
+    "b": ["scan_left", "X", "L"],
+    "X": ["accept", "X", "N"]
+  },
+  "scan_left": {
+    "a": ["scan_left", "a", "L"],
+    "b": ["scan_left", "b", "L"],
+    "X": ["q0", "X", "R"]
+  },
+  "accept": {},
+  "reject": {}
+}`,
         initial_state: "q0", accept_states: ["accept"], reject_states: ["reject"],
       },
       {
