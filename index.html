@@ -127,7 +127,7 @@ const LEVELS = [
       { title: "Walk-through", body: "• q0: scan right over a/b/c, on '_' switch to q1 and move L\n• q1: on '_' erase and keep moving L\n• q1: on a real symbol (a/b/c) → accept without erasing it" },
       { title: "Solution", body: `{\n  "q0": {\n    "a": ["q0","a","R"], "b": ["q0","b","R"], "c": ["q0","c","R"],\n    "_": ["q1","_","L"]\n  },\n  "q1": {\n    "_": ["q1","_","L"],\n    "a": ["accept","a","N"],\n    "b": ["accept","b","N"],\n    "c": ["accept","c","N"]\n  },\n  "accept": {}\n}`, isCode: true },
     ],
-    starter: `{\n  "q0": {\n    "a": ["q0", "a", "R"],\n    "b": ["q0", "b", "R"],\n    "c": ["q0", "c", "R"],\n    "_": ["q1", "_", "L"]\n  },\n  "q1": {\n    "_": ["q1", "_", "L"],\n    "a": ["???", "a", "N"],\n    "b": ["???", "b", "N"],\n    "c": ["???", "c", "N"]\n  },\n  "accept": {}\n}`,
+    starter: `{\n  "q0": {\n    "a": ["q0", "a", "R"],\n    "b": ["q0", "b", "R"],\n    "c": ["q0", "c", "R"],\n    "_": ["q1", "_", "L"]\n  },\n  "q1": {\n    "_": ["q1", "_", "L"],\n    "a": ["accept", "a", "N"],\n    "b": ["accept", "b", "N"],\n    "c": ["accept", "c", "N"]\n  },\n  "accept": {}\n}`,
   },
   {
     id: 4, name: "Palindrome Check",
@@ -177,6 +177,130 @@ function useSwipe(onLeft, onRight) {
     startX.current = null;
   };
   return { onTouchStart, onTouchEnd };
+}
+
+// ─── Editor Screen Component ─────────────────────────────────────────────────
+
+function EditorScreen({ level, onBack, onComplete, savedCode, onSave }) {
+  const [code, setCode] = useState(savedCode ?? level.starter);
+  const [results, setResults] = useState(null);
+  const [error, setError] = useState(null);
+  const [activeStepResult, setActiveStepResult] = useState(null);
+  const [showHints, setShowHints] = useState(false);
+  const [parsedMachine, setParsedMachine] = useState(null);
+  const { narrow } = useViewport();
+
+  const handleRun = () => {
+    try {
+      const parsed = JSON.parse(code);
+      setError(null);
+      setParsedMachine(parsed);
+      const machine = createMachine(parsed, level.initial_state, level.accept_states, level.reject_states);
+      const res = validateSolution(machine, level.test_cases);
+      setResults(res);
+      if (res.every(r => r.passed)) {
+        onComplete();
+      }
+    } catch (e) {
+      setError(e.message);
+      setResults(null);
+    }
+  };
+
+  useEffect(() => {
+    try {
+      setParsedMachine(JSON.parse(code));
+    } catch {
+      setParsedMachine(null);
+    }
+  }, [code]);
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100dvh", overflow: "hidden" }}>
+      {/* Top Bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "12px 16px", background: "#13131f", borderBottom: "1px solid #2d2d44", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={onBack} style={{ background: "#2d2d44", border: "none", borderRadius: 8,
+            color: "#a5b4fc", width: 40, height: 40, cursor: "pointer", fontSize: 16,
+            display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
+          <div>
+            <div style={{ fontSize: 11, color: "#6366f1", fontWeight: 700, textTransform: "uppercase" }}>Level {level.id}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{level.name}</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setShowHints(true)} style={{ background: "#2d2d44", border: "1px solid #3d3d5e",
+            borderRadius: 8, color: "#a5b4fc", padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, minHeight: 40 }}>Hints</button>
+          <button onClick={() => { setCode(level.starter); onSave(level.id, level.starter); }} style={{ background: "#2d2d44", border: "1px solid #3d3d5e",
+            borderRadius: 8, color: "#aaa", padding: "8px 12px", cursor: "pointer", fontSize: 13, minHeight: 40 }}>Reset</button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div style={{ flex: 1, display: "flex", flexDirection: narrow ? "column" : "row", overflow: "hidden" }}>
+        {/* Left / Top: Description & Editor */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", borderRight: narrow ? "none" : "1px solid #2d2d44", overflow: "hidden" }}>
+          <div style={{ padding: 16, background: "#0e0e17", borderBottom: "1px solid #2d2d44", fontSize: 13, color: "#aaa", lineHeight: 1.5, flexShrink: 0 }}>
+            {level.description}
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: 12, overflow: "hidden" }}>
+            <textarea
+              value={code}
+              onChange={e => { setCode(e.target.value); onSave(level.id, e.target.value); }}
+              spellCheck="false"
+              style={{
+                flex: 1, background: "#0a0a15", color: "#e2e2f2", border: "1px solid #2d2d44",
+                borderRadius: 10, padding: 14, fontFamily: "monospace", fontSize: 13,
+                lineHeight: 1.6, resize: "none", outline: "none",
+              }}
+            />
+            {error && <div style={{ color: "#f87171", fontSize: 12, marginTop: 8, fontFamily: "monospace" }}>{error}</div>}
+          </div>
+          <div style={{ padding: 12, background: "#13131f", borderTop: "1px solid #2d2d44", flexShrink: 0 }}>
+            <button onClick={handleRun} style={{
+              width: "100%", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none",
+              borderRadius: 10, color: "#fff", padding: 14, cursor: "pointer", fontWeight: 700, fontSize: 15, minHeight: 48,
+            }}>Run Tests →</button>
+          </div>
+        </div>
+
+        {/* Right / Bottom: Test Results & Diagram */}
+        <div style={{ width: narrow ? "100%" : "380px", display: "flex", flexDirection: "column", background: "#0c0c14", overflowY: "auto", flexShrink: 0 }}>
+          <div style={{ padding: 16, borderBottom: "1px solid #2d2d44" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#888", textTransform: "uppercase", marginBottom: 12 }}>State Diagram</div>
+            {parsedMachine ? <StateDiagram transitions={parsedMachine} currentState={null} /> : <div style={{ color: "#555", fontSize: 12 }}>Invalid JSON</div>}
+          </div>
+          <div style={{ padding: 16, flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#888", textTransform: "uppercase", marginBottom: 12 }}>Test Cases</div>
+            {results ? (
+              <TestResults results={results} onStepThrough={r => setActiveStepResult(r)} />
+            ) : (
+              <div style={{ color: "#555", fontSize: 13, textAlign: "center", padding: 32 }}>Click "Run Tests" to verify your machine.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showHints && (
+        <HintPanel
+          hints={level.hints}
+          onClose={() => setShowHints(false)}
+          onUseSolution={sol => { setCode(sol); onSave(level.id, sol); }}
+          narrow={narrow}
+        />
+      )}
+
+      {activeStepResult && parsedMachine && (
+        <StepModal
+          result={activeStepResult}
+          transitions={parsedMachine}
+          onClose={() => setActiveStepResult(null)}
+          narrow={narrow}
+        />
+      )}
+    </div>
+  );
 }
 
 // ─── Hint Panel ───────────────────────────────────────────────────────────────
