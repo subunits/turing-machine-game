@@ -111,7 +111,7 @@ const LEVELS = [
       { title: "Walk-through", body: "• q0 reads '1' → stay in q0, move R (scan past)\n• q0 reads '_' → write '1', go to q1 (now head is on the new 1)\n• q1 reads '1' → accept" },
       { title: "Solution", body: `{\n  "q0": {\n    "1": ["q0", "1", "R"],\n    "_": ["q1", "1", "N"]\n  },\n  "q1": {\n    "1": ["accept", "1", "N"]\n  },\n  "accept": {}\n}`, isCode: true },
     ],
-    starter: `{\n  "q0": {\n    "1": ["q0", "1", "R"],\n    "_": ["q1", "1", "N"]\n  },\n  "q1": {\n    "1": ["???", "1", "N"]\n  },\n  "accept": {}\n}`,
+    starter: `{\n  "q0": {\n    "1": ["q0", "1", "R"],\n    "_": ["q1", "1", "N"]\n  },\n  "q1": {\n    "1": ["accept", "1", "N"]\n  },\n  "accept": {}\n}`,
   },
   {
     id: 3, name: "Strip Trailing Blanks",
@@ -828,3 +828,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
 </body>
 </html>
+```[cite: 1]
