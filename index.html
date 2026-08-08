@@ -227,7 +227,7 @@ function HintPanel({ level, onClose, onUseSolution, narrow }) {
 
         {/* Pinned header */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
-          padding: narrow ? "16px 16px 12px" : "24px 24px 16px", flexShrink:0 }}>
+          padding: narrow ? "16px 16px 12px" : "24px 24px 16px", flexShrink:0 }} {...swipe}>
           <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
             {panels.map((p, i) => (
               <button key={i} onClick={() => setIdx(i)} style={{
@@ -243,14 +243,15 @@ function HintPanel({ level, onClose, onUseSolution, narrow }) {
         </div>
 
         {/* Scrollable body only */}
-        <div style={{ flex:1, overflowY:"auto", padding: narrow ? "0 16px" : "0 24px", minHeight:0 }} {...swipe}>
+        <div style={{ flex:1, overflowY:"auto", overflowX:"hidden", padding: narrow ? "0 16px" : "0 24px", minHeight:0 }}>
           {panel.isCode ? (
             <pre style={{ background:"#0a0a15", border:"1px solid #2d2d44", borderRadius:10,
-              padding:16, color:"#e2e2f2", fontSize:12, lineHeight:1.7,
-              whiteSpace:"pre-wrap", wordBreak:"break-word", fontFamily:"monospace", margin:0 }}>{panel.body}</pre>
+              padding:12, color:"#e2e2f2", fontSize: narrow ? 10.5 : 12, lineHeight:1.6,
+              whiteSpace:"pre", overflowX:"auto", fontFamily:"monospace", margin:0,
+              WebkitOverflowScrolling:"touch" }}>{panel.body}</pre>
           ) : (
             <pre style={{ color:"#ccc", fontSize:14, lineHeight:1.8, margin:0,
-              whiteSpace:"pre-wrap", wordBreak:"break-word", fontFamily:"inherit" }}>{panel.body}</pre>
+              whiteSpace:"pre-wrap", overflowWrap:"break-word", fontFamily:"inherit" }}>{panel.body}</pre>
           )}
         </div>
 
