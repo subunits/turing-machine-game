@@ -170,9 +170,22 @@ const LEVELS = [
   },
 ];
 
-// Pre-stringify all solutions for display
+// Compact formatter: keeps ["state","write","dir"] arrays on one line
+function formatMachine(solution) {
+  const stateLines = Object.entries(solution).map(([state, trans]) => {
+    const symKeys = Object.keys(trans);
+    if (symKeys.length === 0) return `  "${state}": {}`;
+    const symLines = symKeys.map(sym => {
+      const [ns, ws, dir] = trans[sym];
+      return `    "${sym}": ["${ns}", "${ws}", "${dir}"]`;
+    });
+    return `  "${state}": {\n${symLines.join(",\n")}\n  }`;
+  });
+  return `{\n${stateLines.join(",\n")}\n}`;
+}
+
 LEVELS.forEach(lvl => {
-  lvl.solutionStr = JSON.stringify(lvl.solution, null, 2);
+  lvl.solutionStr = formatMachine(lvl.solution);
 });
 
 function useSwipe(onLeft, onRight) {
